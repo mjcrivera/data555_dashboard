@@ -1,0 +1,436 @@
+---
+title: "Frontline Community Health Worker (FLCHW) Digital Readiness in Katsina State, Nigeria"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+    social: ["https://github.com/mjcrivera/data555_dashboard"]
+    source_code: "https://github.com/mjcrivera/data555_dashboard"
+runtime: shiny
+---
+
+Main Dashboard
+=====================================
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(plotly)
+library(crosstalk)
+library(DT)
+library(janitor)
+library(stringr)
+
+# Load data
+flchw <- read_csv("FLHCW_cleaned.csv") 
+
+# Clean and prep variables
+flchw <- flchw %>%
+  mutate(
+    yrs_experience = factor(yrs_experience, 
+                            levels = c("1-5", "6-10", ">10")),
+    daily_hh = factor(daily_hh, 
+                      levels = c("0-5", "6-10", "11-20", "20+")),
+    education_group = factor(education_lvl,
+                             levels = c(1, 2, 3),
+                             labels = c("Basic", "Intermediate", "Advanced")),
+    digital_access = ifelse(
+      access_smartphone == 1 |
+      access_computer_laptop == 1 |
+      access_internet_connection == 1,
+      1, 0
+    ),
+    ict_tasks = rowSums(select(., contains("ict_")), na.rm = TRUE),
+    # Digital readiness
+    digitally_ready = ifelse(
+      digital_access == 1 &
+      ict_tasks >= 2 &
+      interest_improving == 1,
+      1, 0
+    ),
+    digitally_ready = factor(digitally_ready,
+                           levels = c(0,1),
+                           labels = c("Not Ready", "Ready"))
+  )
+shared_flchw <- SharedData$new(flchw)
+filtered_data <- reactive({
+  shared_flchw$data(withSelection = TRUE)
+})
+```
+
+Columns {data-width=350}
+-----------------------------------------------------------------------
+
+### **Customize Data**
+
+```{r Filter}
+filter_checkbox(
+  id = "sex", 
+  label = "Sex:", 
+  sharedData = shared_flchw, 
+  group = ~sex,
+  inline = TRUE 
+)
+filter_checkbox(
+  id = "lga", 
+  label = "Local Government Area (LGA):", 
+  sharedData = shared_flchw, 
+  group = ~lga,
+  inline = FALSE 
+)
+tags$p(
+  style = "font-size: 12px; color: #666; margin-top: 15px; font-style: italic;",
+  tags$strong("Tip:"), "If no boxes are checked, the dashboard shows data for ALL respondents.",
+  tags$br(),
+  "You can select multiple boxes to compare specific groups."
+)
+```
+
+-----------------------------------------------------------------------
+
+### **Project Impact and Importance**
+
+**Impact:** This dashboard identifies critical gaps in digital literacy and infrastructure among frontline community health workers (FLCHWs) in Katsina State, providing a data-driven roadmap for targeted investment in mobile health technologies.
+
+**Utility:** By pinpointing specific skill deficiencies across different demographic and education levels, stakeholders can optimize training resources to ensure the workforce is prepared for the digital transformation of community health delivery.
+
+Columns {data-width=650}
+-----------------------------------------------------------------------
+
+### **Information and Communication Technology (ICT) Profile**
+
+```{r Radar Chart}
+label_lookup <- c(
+  access_smartphone          = "Own/Regular access to smartphone",
+  access_computer_laptop     = "Own/Regular access to computer/laptop",
+  access_internet_connection = "Own/Regular access to internet connection",
+  ict_copy_move              = "Copied/Moved files/folders",
+  ict_instal_setup           = "Installed or set up software/mobile apps",
+  ict_web_search             = "Search using web browser",
+  ict_course_training        = "Participated in online course/training",
+  ict_create_edit            = "Created/Edited a document",
+  ict_social_media           = "Used social media platforms"
+)
+renderPlotly({
+  df_filtered <- shared_flchw$data(withSelection = TRUE)
+  radar_base <- df_filtered %>%
+  select(any_of(names(label_lookup))) %>%
+  summarise(across(everything(), ~ round(mean(. == 1, na.rm = TRUE) * 100, 0))) %>%
+  pivot_longer(cols = everything(), names_to = "variable", values_to = "value") %>%
+  mutate(
+    full_label = label_lookup[variable],
+    clean_label = stringr::str_wrap(full_label, width = 20) %>% 
+                  stringr::str_replace_all("\n", "<br>")
+  )
+radar_plot_data <- rbind(radar_base, radar_base[1,])
+radar_plot_data %>%
+plot_ly(
+  type = 'scatterpolar',
+  r = ~value,
+  theta = ~clean_label,
+  fill = 'toself',
+  mode = 'markers+lines',
+  hoverinfo = "text",
+  text = ~paste0(clean_label, ": ", value, "%")
+) %>%
+  layout(
+    polar = list(
+      # The domain (0 to 1) defines how much of the box the chart takes up.
+      # Setting it to 0.1 to 0.9 leaves 10% buffer for labels on all sides.
+      domain = list(x = c(0.1, 0.9), y = c(0.1, 0.9)),
+      radialaxis = list(
+        visible = T,
+        range = c(0, 100),
+        showticklabels = FALSE
+      )
+    ),
+    showlegend = F,
+    # Standardize margins (in pixels)
+    margin = list(l = 50, r = 50, t = 50, b = 50),
+    title = list(
+      text = "Workforce ICT Proficiency (%)",
+      y = 0.98 # Moves the title slightly higher
+    ),
+    font = list(size = 12) # Slightly smaller font helps on mobile
+  )
+})
+```
+
+-----------------------------------------------------------------------
+
+### **Takeaways**
+The radar chart reveals a "pull" toward smartphone access, while internet and advanced ICT tasks (like creating/editing a document) lag behind. This visualization highlights exactly which specific skills need the most intervention.
+
+Row
+-----------------------------------------------------------------------
+
+### **Workforce Characteristics**
+
+```{r Table 1}
+renderDT({
+  df_table <- shared_flchw$data(withSelection = TRUE)
+  total_n <- nrow(df_table)
+  
+  # Missingness calculation
+  core_cols <- c("sex", "age", "daily_hh", "yrs_experience", "education_lvl")
+  ict_cols <- names(df_table)[grep("ict_|access_", names(df_table))]
+  n_missing <- sum(!complete.cases(df_table[, intersect(names(df_table), c(core_cols, ict_cols))]))
+
+  # Helper functions (keeping the 1-decimal logic)
+  get_var_rows <- function(data, col_name, label) {
+    header <- data.frame(Characteristic = paste0("<b>", label, "</b>"), N_Percent = "", stringsAsFactors = FALSE)
+    unique_vals <- if(is.factor(data[[col_name]])) levels(data[[col_name]]) else sort(unique(na.omit(data[[col_name]])))
+    details <- map_df(unique_vals, function(v) {
+      n_val <- sum(data[[col_name]] == v, na.rm = TRUE)
+      p_val <- sprintf("%.1f", (n_val / total_n) * 100)
+      data.frame(Characteristic = paste0("&nbsp;&nbsp;&nbsp;&nbsp;", v), N_Percent = paste0(n_val, " (", p_val, "%)"))
+    })
+    bind_rows(header, details)
+  }
+
+  get_binary_row <- function(data, col_name, label) {
+    n_val <- sum(data[[col_name]] == 1, na.rm = TRUE)
+    p_val <- sprintf("%.1f", (n_val / total_n) * 100)
+    data.frame(Characteristic = paste0("&nbsp;&nbsp;&nbsp;&nbsp;", label), N_Percent = paste0(n_val, " (", p_val, "%)"))
+  }
+
+  # Build Table with Superscript Asterisks for Multi-Response Sections
+  summary_df <- bind_rows(
+    data.frame(Characteristic = "<b>Total Respondents</b>", N_Percent = as.character(total_n)),
+    get_var_rows(df_table, "age", "Age (Years)"),
+    get_var_rows(df_table, "sex", "Sex"),
+    get_var_rows(df_table, "education_group", "Highest Education Level"),
+    get_var_rows(df_table, "yrs_experience", "Years of FLCHW Experience"),
+    get_var_rows(df_table, "daily_hh", "Households Served Daily"),
+    
+    # Adding the asterisk to multi-select headers
+    data.frame(Characteristic = "<b>Digital Access*</b>", N_Percent = ""),
+    get_binary_row(df_table, "access_smartphone", "Smartphone"),
+    get_binary_row(df_table, "access_computer_laptop", "Computer/Laptop"),
+    get_binary_row(df_table, "access_internet_connection", "Internet Connection"),
+    
+    data.frame(Characteristic = "<b>ICT Skills Performed*</b>", N_Percent = ""),
+    get_binary_row(df_table, "ict_copy_move", "Copy/Move Files"),
+    get_binary_row(df_table, "ict_instal_setup", "Install/Setup Apps"),
+    get_binary_row(df_table, "ict_web_search", "Web Browser Search"),
+    get_binary_row(df_table, "ict_course_training", "Online Course/Training"),
+    get_binary_row(df_table, "ict_create_edit", "Create/Edit Document"),
+    get_binary_row(df_table, "ict_social_media", "Social Media Use"),
+    
+    data.frame(Characteristic = "<b>Professional Development</b>", N_Percent = ""),
+    get_binary_row(df_table, "interest_improving", "Interested in Improving Skills")
+  )
+
+  datatable(
+    summary_df,
+    colnames = c("Characteristic", "N(%)"),
+    caption = htmltools::tags$caption(
+      style = 'caption-side: bottom; text-align: left; font-style: italic; font-size: 11px; color: #555; margin-top: 10px;',
+      htmltools::HTML(paste0(
+        "<b>Note:</b> Percentages are calculated based on the total N of ", total_n, ". ",
+        "In this selection, ", n_missing, " respondent(s) had missing data for all ICT proficiency
+        indicators.<br>",
+        "<b>*</b> Denotes multiple-response categories where respondents could select more than one option; percentages may sum to >100%."
+      ))
+    ),
+    escape = FALSE,
+    rownames = FALSE,
+    options = list(
+      dom = 't',
+      paging = FALSE,
+      ordering = FALSE,
+      columnDefs = list(list(className = 'dt-left', targets = "_all")),
+      initComplete = JS("function(settings, json) {
+        $(this.api().table().container()).css({
+          'font-size': '15px', 
+          'line-height': '1.2'
+        });
+        $(this.api().table().body()).find('td').css({
+          'padding-top': '2px', 
+          'padding-bottom': '2px'});}")
+    ),
+    class = 'cell-border stripe'
+  )
+})
+```
+
+Column
+-----------------------------------------------------------------------
+
+### **Digital Readiness by Education Level**
+
+```{r Stacked Bar Chart}
+renderPlotly({
+  # Use filtered data so the bar chart updates with the checkboxes!
+  df_bar <- shared_flchw$data(withSelection = TRUE)
+  
+  plot_data <- df_bar %>%
+    group_by(education_group, digitally_ready) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    group_by(education_group) %>%
+    mutate(percent = round(n / sum(n) * 100, 1))
+  plot_ly(
+  plot_data,
+  x = ~education_group,
+  y = ~percent,
+  color = ~digitally_ready,
+  type = "bar",
+  text = ~paste0(percent, "%"),
+  textposition = "auto",
+
+  hovertemplate = paste(
+    "Education: %{x}<br>",
+    "Status: %{fullData.name}<br>",
+    "Percent: %{y}%<extra></extra>"
+  )
+) %>%
+    layout(
+      barmode = "stack",
+      yaxis = list(title = "Percentage (%)", range = c(0, 100)),
+      xaxis = list(title = "Education Level"),
+      title = "Digital Readiness by Education Level",
+      legend = list(orientation = 'h', y = -0.1),
+      hoverlabel = list(font = list(size = 14))
+    )
+})
+```
+
+-----------------------------------------------------------------------
+
+### **Takeaways**
+Digital readiness differs across education levels, with the highest levels observed among those FLCHWs with advanced education. FLCHWs with intermediate education show mixed readiness, reflecting variability within the core workforce targeted. FLCHWs with basic education appear less likely to meet readiness criteria, suggesting potential gaps in digital exposure or training. These patterns indicate that education level is an important determinant of readiness and should inform targeted digital capacity-building strategies.
+
+Row
+-----------------------------------------------------------------------
+
+### **Factors Associated to Digital Readiness**
+
+```{r Table 2}
+renderDT({
+  # 1. Get live filtered data
+  df_table <- shared_flchw$data(withSelection = TRUE)
+  total_n <- nrow(df_table)
+  
+  # Ensure 'Ready' is the first column
+  df_table$digitally_ready <- factor(df_table$digitally_ready, levels = c("Ready", "Not Ready"))
+  
+  if (total_n == 0) return(NULL)
+
+  # 2. DYNAMIC MISSING DATA CALCULATION
+  ict_cols <- names(df_table)[grep("ict_", names(df_table))]
+  n_missing_ict <- sum(rowSums(is.na(df_table[, grep("ict_", names(df_table))])) == 6)
+  # 3. Helper function for bivariate rows
+  get_bivariate_row <- function(data, col_name, label, is_binary = FALSE) {
+    p_val_text <- "N/A"
+    try({
+      tab <- table(data[[col_name]], data$digitally_ready)
+      if(nrow(tab) > 1 && ncol(tab) > 1) {
+        p_val <- fisher.test(tab, simulate.p.value = TRUE)$p.value
+        p_val_text <- ifelse(p_val < 0.0001, "< 0.0001", sprintf("%.4f", p_val))
+      }
+    }, silent = TRUE)
+
+    header <- data.frame(
+      Characteristic = paste0("<b>", label, "</b>"),
+      Ready = "", Not_Ready = "", P_Value = p_val_text,
+      stringsAsFactors = FALSE
+    )
+
+    if(is_binary) {
+      unique_vals <- c(1, 0)
+      labels_map <- c("1" = "Any", "0" = "None")
+    } else {
+      unique_vals <- if(is.factor(data[[col_name]])) levels(data[[col_name]]) else sort(unique(na.omit(data[[col_name]])))
+      labels_map <- NULL
+    }
+    
+    details <- map_df(unique_vals, function(v) {
+      cat_data <- data[data[[col_name]] == v & !is.na(data[[col_name]]), ]
+      n_cat_total <- nrow(cat_data)
+      n_r <- sum(cat_data$digitally_ready == "Ready", na.rm = TRUE)
+      p_r <- if(n_cat_total > 0) sprintf("%.1f", (n_r / n_cat_total) * 100) else "0.0"
+      n_nr <- sum(cat_data$digitally_ready == "Not Ready", na.rm = TRUE)
+      p_nr <- if(n_cat_total > 0) sprintf("%.1f", (n_nr / n_cat_total) * 100) else "0.0"
+      display_label <- if(!is.null(labels_map)) labels_map[as.character(v)] else v
+      
+      data.frame(
+        Characteristic = paste0("&nbsp;&nbsp;&nbsp;&nbsp;", display_label),
+        Ready = paste0(n_r, " (", p_r, "%)"),
+        Not_Ready = paste0(n_nr, " (", p_nr, "%)"),
+        P_Value = "",
+        stringsAsFactors = FALSE
+      )
+    })
+    bind_rows(header, details)
+  }
+
+  # 4. Calculate Total Row Values
+  n_total_ready <- sum(df_table$digitally_ready == "Ready", na.rm = TRUE)
+  p_total_ready <- sprintf("%.1f", (n_total_ready / total_n) * 100)
+  
+  n_total_not <- sum(df_table$digitally_ready == "Not Ready", na.rm = TRUE)
+  p_total_not <- sprintf("%.1f", (n_total_not / total_n) * 100)
+
+  # 5. Assemble Table 2
+  table2_df <- bind_rows(
+    # DYNAMIC TOTAL ROW
+    data.frame(
+      Characteristic = "<b>Total Respondents</b>",
+      Ready = paste0(n_total_ready, " (", p_total_ready, "%)"),
+      Not_Ready = paste0(n_total_not, " (", p_total_not, "%)"),
+      P_Value = "",
+      stringsAsFactors = FALSE
+    ),
+    get_bivariate_row(df_table, "age", "Age (Years)"),
+    get_bivariate_row(df_table, "sex", "Sex"),
+    get_bivariate_row(df_table, "education_group", "Highest Education Level"),
+    get_bivariate_row(df_table, "yrs_experience", "Years of FLCHW Experience"),
+    get_bivariate_row(df_table, "daily_hh", "Households Served Daily"),
+    get_bivariate_row(df_table, "digital_access", "Digital Access (Work tools)", is_binary = TRUE)
+  )
+
+  # 6. Render
+  datatable(
+    table2_df,
+    colnames = c("Characteristic", "Ready (N, %)", "Not Ready (N, %)", "Fisher's Exact Test (p-value)"),
+    caption = htmltools::tags$caption(
+      style = 'caption-side: bottom; text-align: left; font-style: italic; font-size: 12px; color: #555;
+      margin-top: 10px;',
+      htmltools::HTML(paste0(
+        "<b>Note:</b> Percentages are based on N = ", total_n, ". ",
+        "In this selection, ", n_missing_ict, " respondent(s) had missing data for all ICT proficiency
+        indicators ",
+        "and are included in the 'Not Ready' group by default."
+        ))
+      ),
+    escape = FALSE,
+    rownames = FALSE,
+    selection = 'none',
+    options = list(
+      dom = 't',
+      paging = FALSE,
+      ordering = FALSE,
+      columnDefs = list(
+        list(className = 'dt-left', targets = 0),
+        list(className = 'dt-center', targets = 1:3)
+      ),
+      initComplete = JS("function(settings, json) {
+        $(this.api().table().container()).css({
+          'font-size': '15.5px', 
+          'line-height': '1.3'
+        });
+        $(this.api().table().body()).find('td').css({
+          'padding-top': '2px', 
+          'padding-bottom': '2px'});}")
+    ),
+    class = 'cell-border stripe'
+  )
+})
+```
+
+Dataset Description
+=====================================
+
+### **About the Dataset**
+
+This dashboard utilizes data from a frontline community health worker (FLCHW) survey conducted in Katsina State, Nigeria, between May-June 2025. The study population consists of 342 health workers across three Local Government Areas (Charanchi, Katsina, and Mani) to assess their digital readiness for health interventions. The data was collected through a structured cross-sectional survey using mobile-based questionnaires to capture information on ICT proficiency and tool access. For privacy and ethical reasons, this dataset is considered confidential and is not currently available in a public repository.

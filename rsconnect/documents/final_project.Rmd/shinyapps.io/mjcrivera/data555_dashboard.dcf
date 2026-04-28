@@ -1,0 +1,12 @@
+name: data555_dashboard
+title: data555_dashboard
+username: mjcrivera
+account: mjcrivera
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17243348
+bundleId: 11916340
+url: https://mjcrivera.shinyapps.io/data555_dashboard/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
