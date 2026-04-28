@@ -135,8 +135,6 @@ plot_ly(
 ) %>%
   layout(
     polar = list(
-      # The domain (0 to 1) defines how much of the box the chart takes up.
-      # Setting it to 0.1 to 0.9 leaves 10% buffer for labels on all sides.
       domain = list(x = c(0.1, 0.9), y = c(0.1, 0.9)),
       radialaxis = list(
         visible = T,
@@ -145,13 +143,12 @@ plot_ly(
       )
     ),
     showlegend = F,
-    # Standardize margins (in pixels)
     margin = list(l = 50, r = 50, t = 50, b = 50),
     title = list(
       text = "Workforce ICT Proficiency (%)",
-      y = 0.98 # Moves the title slightly higher
+      y = 0.98
     ),
-    font = list(size = 12) # Slightly smaller font helps on mobile
+    font = list(size = 12) 
   )
 })
 ```
@@ -194,7 +191,7 @@ renderDT({
     data.frame(Characteristic = paste0("&nbsp;&nbsp;&nbsp;&nbsp;", label), N_Percent = paste0(n_val, " (", p_val, "%)"))
   }
 
-  # Build Table with Superscript Asterisks for Multi-Response Sections
+  # Table with Superscript Asterisks for Multi-Response Sections
   summary_df <- bind_rows(
     data.frame(Characteristic = "<b>Total Respondents</b>", N_Percent = as.character(total_n)),
     get_var_rows(df_table, "age", "Age (Years)"),
@@ -261,7 +258,7 @@ Column
 
 ```{r Stacked Bar Chart}
 renderPlotly({
-  # Use filtered data so the bar chart updates with the checkboxes!
+  # Filtered data so the bar chart updates with the check boxes
   df_bar <- shared_flchw$data(withSelection = TRUE)
   
   plot_data <- df_bar %>%
@@ -307,19 +304,19 @@ Row
 
 ```{r Table 2}
 renderDT({
-  # 1. Get live filtered data
+  # Live filtered data
   df_table <- shared_flchw$data(withSelection = TRUE)
   total_n <- nrow(df_table)
   
-  # Ensure 'Ready' is the first column
+  # 'Ready' is the first column
   df_table$digitally_ready <- factor(df_table$digitally_ready, levels = c("Ready", "Not Ready"))
   
   if (total_n == 0) return(NULL)
 
-  # 2. DYNAMIC MISSING DATA CALCULATION
+  # Missing data calculation
   ict_cols <- names(df_table)[grep("ict_", names(df_table))]
   n_missing_ict <- sum(rowSums(is.na(df_table[, grep("ict_", names(df_table))])) == 6)
-  # 3. Helper function for bivariate rows
+  # Helper function for bivariate rows
   get_bivariate_row <- function(data, col_name, label, is_binary = FALSE) {
     p_val_text <- "N/A"
     try({
@@ -364,16 +361,15 @@ renderDT({
     bind_rows(header, details)
   }
 
-  # 4. Calculate Total Row Values
+  # Total Row Values
   n_total_ready <- sum(df_table$digitally_ready == "Ready", na.rm = TRUE)
   p_total_ready <- sprintf("%.1f", (n_total_ready / total_n) * 100)
   
   n_total_not <- sum(df_table$digitally_ready == "Not Ready", na.rm = TRUE)
   p_total_not <- sprintf("%.1f", (n_total_not / total_n) * 100)
 
-  # 5. Assemble Table 2
+  # Table 2
   table2_df <- bind_rows(
-    # DYNAMIC TOTAL ROW
     data.frame(
       Characteristic = "<b>Total Respondents</b>",
       Ready = paste0(n_total_ready, " (", p_total_ready, "%)"),
@@ -389,7 +385,7 @@ renderDT({
     get_bivariate_row(df_table, "digital_access", "Digital Access (Work tools)", is_binary = TRUE)
   )
 
-  # 6. Render
+  # Render
   datatable(
     table2_df,
     colnames = c("Characteristic", "Ready (N, %)", "Not Ready (N, %)", "Fisher's Exact Test (p-value)"),
