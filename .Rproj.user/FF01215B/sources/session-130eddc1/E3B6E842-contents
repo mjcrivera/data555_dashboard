@@ -22,7 +22,7 @@ library(janitor)
 library(stringr)
 
 # Load data
-flchw <- read_csv("FLHCW_cleaned.csv") 
+flchw <- read_csv("data.csv") 
 
 # Clean and prep variables
 flchw <- flchw %>%
