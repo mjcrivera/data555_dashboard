@@ -134,6 +134,7 @@ plot_ly(
   text = ~paste0(clean_label, ": ", value, "%")
 ) %>%
   layout(
+    autosize = TRUE,
     polar = list(
       domain = list(x = c(0.1, 0.9), y = c(0.1, 0.9)),
       radialaxis = list(
@@ -179,7 +180,7 @@ renderDT({
     unique_vals <- if(is.factor(data[[col_name]])) levels(data[[col_name]]) else sort(unique(na.omit(data[[col_name]])))
     details <- map_df(unique_vals, function(v) {
       n_val <- sum(data[[col_name]] == v, na.rm = TRUE)
-      p_val <- sprintf("%.1f", (n_val / total_n) * 100)
+      p_val <- sprintf("%.0f", (n_val / total_n) * 100)
       data.frame(Characteristic = paste0("&nbsp;&nbsp;&nbsp;&nbsp;", v), N_Percent = paste0(n_val, " (", p_val, "%)"))
     })
     bind_rows(header, details)
@@ -187,7 +188,7 @@ renderDT({
 
   get_binary_row <- function(data, col_name, label) {
     n_val <- sum(data[[col_name]] == 1, na.rm = TRUE)
-    p_val <- sprintf("%.1f", (n_val / total_n) * 100)
+    p_val <- sprintf("%.0f", (n_val / total_n) * 100)
     data.frame(Characteristic = paste0("&nbsp;&nbsp;&nbsp;&nbsp;", label), N_Percent = paste0(n_val, " (", p_val, "%)"))
   }
 
@@ -265,7 +266,7 @@ renderPlotly({
     group_by(education_group, digitally_ready) %>%
     summarise(n = n(), .groups = "drop") %>%
     group_by(education_group) %>%
-    mutate(percent = round(n / sum(n) * 100, 1))
+    mutate(percent = round(n / sum(n) * 100, 0))
   plot_ly(
   plot_data,
   x = ~education_group,
@@ -282,6 +283,7 @@ renderPlotly({
   )
 ) %>%
     layout(
+      autosize = TRUE,
       barmode = "stack",
       yaxis = list(title = "Percentage (%)", range = c(0, 100)),
       xaxis = list(title = "Education Level"),
@@ -345,9 +347,9 @@ renderDT({
       cat_data <- data[data[[col_name]] == v & !is.na(data[[col_name]]), ]
       n_cat_total <- nrow(cat_data)
       n_r <- sum(cat_data$digitally_ready == "Ready", na.rm = TRUE)
-      p_r <- if(n_cat_total > 0) sprintf("%.1f", (n_r / n_cat_total) * 100) else "0.0"
+      p_r <- if(n_cat_total > 0) sprintf("%.0f", (n_r / n_cat_total) * 100) else "0.0"
       n_nr <- sum(cat_data$digitally_ready == "Not Ready", na.rm = TRUE)
-      p_nr <- if(n_cat_total > 0) sprintf("%.1f", (n_nr / n_cat_total) * 100) else "0.0"
+      p_nr <- if(n_cat_total > 0) sprintf("%.0f", (n_nr / n_cat_total) * 100) else "0.0"
       display_label <- if(!is.null(labels_map)) labels_map[as.character(v)] else v
       
       data.frame(
@@ -363,10 +365,10 @@ renderDT({
 
   # Total Row Values
   n_total_ready <- sum(df_table$digitally_ready == "Ready", na.rm = TRUE)
-  p_total_ready <- sprintf("%.1f", (n_total_ready / total_n) * 100)
+  p_total_ready <- sprintf("%.0f", (n_total_ready / total_n) * 100)
   
   n_total_not <- sum(df_table$digitally_ready == "Not Ready", na.rm = TRUE)
-  p_total_not <- sprintf("%.1f", (n_total_not / total_n) * 100)
+  p_total_not <- sprintf("%.0f", (n_total_not / total_n) * 100)
 
   # Table 2
   table2_df <- bind_rows(
@@ -388,7 +390,7 @@ renderDT({
   # Render
   datatable(
     table2_df,
-    colnames = c("Characteristic", "Ready (N, %)", "Not Ready (N, %)", "Fisher's Exact Test (p-value)"),
+    colnames = c("Characteristic", "Ready (N, %)", "Not Ready (N, %)", "Fisher's exact test (p-value)"),
     caption = htmltools::tags$caption(
       style = 'caption-side: bottom; text-align: left; font-style: italic; font-size: 12px; color: #555;
       margin-top: 10px;',

@@ -5,7 +5,7 @@ account: mjcrivera
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 17243348
-bundleId: 11916636
+bundleId: 11916721
 url: https://mjcrivera.shinyapps.io/data555_dashboard/
 version: 1
 asMultiple: FALSE
