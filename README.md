@@ -5,9 +5,9 @@ by Monica Rivera
 on April 27, 2025
 
 ## Overview
-This repository contains the replication code and data for the **Frontline Community Health Worker (FLCHW) Digital Readiness** study. The project analyzes digital access, ICT proficiency, and readiness among health workers to inform targeted capacity-building strategies.
+This repository contains the replication code and data for the **Frontline Community Health Worker (FLCHW) Digital Readiness** study. The project analyzes digital access, Information and Communications Technology (ICT) proficiency, and readiness among health workers to inform targeted capacity-building strategies.
 
-The final dashboard provides an interactive Information and Communications Technology (ICT) proficiency radar chart, workforce characteristic summaries, and a bivariate analysis of factors associated with digital readiness using Fisher’s exact test.
+The final dashboard provides an interactive ICT proficiency radar chart, workforce characteristic summaries, and a bivariate analysis of factors associated with digital readiness using Fisher’s exact test.
 
 ### Contents of the Report 
 * **Workforce ICT Proficiency:** A radar chart visualizing skill gaps in software installation, web search, and document editing.
