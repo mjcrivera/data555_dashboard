@@ -174,7 +174,7 @@ renderDT({
   ict_cols <- names(df_table)[grep("ict_|access_", names(df_table))]
   n_missing <- sum(!complete.cases(df_table[, intersect(names(df_table), c(core_cols, ict_cols))]))
 
-  # Helper functions (keeping the 1-decimal logic)
+  # Helper functions
   get_var_rows <- function(data, col_name, label) {
     header <- data.frame(Characteristic = paste0("<b>", label, "</b>"), N_Percent = "", stringsAsFactors = FALSE)
     unique_vals <- if(is.factor(data[[col_name]])) levels(data[[col_name]]) else sort(unique(na.omit(data[[col_name]])))

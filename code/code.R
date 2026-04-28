@@ -1,3 +1,5 @@
+# Setup
+
 library(flexdashboard)
 library(tidyverse)
 library(plotly)
@@ -7,7 +9,7 @@ library(janitor)
 library(stringr)
 
 # Load data
-flchw <- read_csv("FLHCW_cleaned.csv") 
+flchw <- read_csv("data.csv") 
 
 # Clean and prep variables
 flchw <- flchw %>%
@@ -66,6 +68,7 @@ tags$p(
 )
 
 # Information and Communication Technology (ICT) Profile
+
 label_lookup <- c(
   access_smartphone          = "Own/Regular access to smartphone",
   access_computer_laptop     = "Own/Regular access to computer/laptop",
@@ -100,6 +103,7 @@ renderPlotly({
       text = ~paste0(clean_label, ": ", value, "%")
     ) %>%
     layout(
+      autosize = TRUE,
       polar = list(
         domain = list(x = c(0.1, 0.9), y = c(0.1, 0.9)),
         radialaxis = list(
@@ -112,7 +116,7 @@ renderPlotly({
       margin = list(l = 50, r = 50, t = 50, b = 50),
       title = list(
         text = "Workforce ICT Proficiency (%)",
-        y = 0.98 
+        y = 0.98
       ),
       font = list(size = 12) 
     )
@@ -123,17 +127,19 @@ renderPlotly({
 renderDT({
   df_table <- shared_flchw$data(withSelection = TRUE)
   total_n <- nrow(df_table)
-
+  
+  # Missingness calculation
   core_cols <- c("sex", "age", "daily_hh", "yrs_experience", "education_lvl")
   ict_cols <- names(df_table)[grep("ict_|access_", names(df_table))]
   n_missing <- sum(!complete.cases(df_table[, intersect(names(df_table), c(core_cols, ict_cols))]))
-
+  
+  # Helper functions
   get_var_rows <- function(data, col_name, label) {
     header <- data.frame(Characteristic = paste0("<b>", label, "</b>"), N_Percent = "", stringsAsFactors = FALSE)
     unique_vals <- if(is.factor(data[[col_name]])) levels(data[[col_name]]) else sort(unique(na.omit(data[[col_name]])))
     details <- map_df(unique_vals, function(v) {
       n_val <- sum(data[[col_name]] == v, na.rm = TRUE)
-      p_val <- sprintf("%.1f", (n_val / total_n) * 100)
+      p_val <- sprintf("%.0f", (n_val / total_n) * 100)
       data.frame(Characteristic = paste0("&nbsp;&nbsp;&nbsp;&nbsp;", v), N_Percent = paste0(n_val, " (", p_val, "%)"))
     })
     bind_rows(header, details)
@@ -141,10 +147,11 @@ renderDT({
   
   get_binary_row <- function(data, col_name, label) {
     n_val <- sum(data[[col_name]] == 1, na.rm = TRUE)
-    p_val <- sprintf("%.1f", (n_val / total_n) * 100)
+    p_val <- sprintf("%.0f", (n_val / total_n) * 100)
     data.frame(Characteristic = paste0("&nbsp;&nbsp;&nbsp;&nbsp;", label), N_Percent = paste0(n_val, " (", p_val, "%)"))
   }
-
+  
+  # Table with Superscript Asterisks for Multi-Response Sections
   summary_df <- bind_rows(
     data.frame(Characteristic = "<b>Total Respondents</b>", N_Percent = as.character(total_n)),
     get_var_rows(df_table, "age", "Age (Years)"),
@@ -153,6 +160,7 @@ renderDT({
     get_var_rows(df_table, "yrs_experience", "Years of FLCHW Experience"),
     get_var_rows(df_table, "daily_hh", "Households Served Daily"),
     
+    # Adding the asterisk to multi-select headers
     data.frame(Characteristic = "<b>Digital Access*</b>", N_Percent = ""),
     get_binary_row(df_table, "access_smartphone", "Smartphone"),
     get_binary_row(df_table, "access_computer_laptop", "Computer/Laptop"),
@@ -203,7 +211,7 @@ renderDT({
 })
 
 # Digital Readiness by Education Level
-  
+
 renderPlotly({
   # Filtered data so the bar chart updates with the check boxes
   df_bar <- shared_flchw$data(withSelection = TRUE)
@@ -212,7 +220,7 @@ renderPlotly({
     group_by(education_group, digitally_ready) %>%
     summarise(n = n(), .groups = "drop") %>%
     group_by(education_group) %>%
-    mutate(percent = round(n / sum(n) * 100, 1))
+    mutate(percent = round(n / sum(n) * 100, 0))
   plot_ly(
     plot_data,
     x = ~education_group,
@@ -229,6 +237,7 @@ renderPlotly({
     )
   ) %>%
     layout(
+      autosize = TRUE,
       barmode = "stack",
       yaxis = list(title = "Percentage (%)", range = c(0, 100)),
       xaxis = list(title = "Education Level"),
@@ -241,11 +250,11 @@ renderPlotly({
 # Factors Associated to Digital Readiness
 
 renderDT({
-  # Get live filtered data
+  # Live filtered data
   df_table <- shared_flchw$data(withSelection = TRUE)
   total_n <- nrow(df_table)
   
-  # Ensure 'Ready' is the first column
+  # 'Ready' is the first column
   df_table$digitally_ready <- factor(df_table$digitally_ready, levels = c("Ready", "Not Ready"))
   
   if (total_n == 0) return(NULL)
@@ -282,9 +291,9 @@ renderDT({
       cat_data <- data[data[[col_name]] == v & !is.na(data[[col_name]]), ]
       n_cat_total <- nrow(cat_data)
       n_r <- sum(cat_data$digitally_ready == "Ready", na.rm = TRUE)
-      p_r <- if(n_cat_total > 0) sprintf("%.1f", (n_r / n_cat_total) * 100) else "0.0"
+      p_r <- if(n_cat_total > 0) sprintf("%.0f", (n_r / n_cat_total) * 100) else "0.0"
       n_nr <- sum(cat_data$digitally_ready == "Not Ready", na.rm = TRUE)
-      p_nr <- if(n_cat_total > 0) sprintf("%.1f", (n_nr / n_cat_total) * 100) else "0.0"
+      p_nr <- if(n_cat_total > 0) sprintf("%.0f", (n_nr / n_cat_total) * 100) else "0.0"
       display_label <- if(!is.null(labels_map)) labels_map[as.character(v)] else v
       
       data.frame(
@@ -298,14 +307,14 @@ renderDT({
     bind_rows(header, details)
   }
   
-  # Calculate Total Row Values
+  # Total Row Values
   n_total_ready <- sum(df_table$digitally_ready == "Ready", na.rm = TRUE)
-  p_total_ready <- sprintf("%.1f", (n_total_ready / total_n) * 100)
+  p_total_ready <- sprintf("%.0f", (n_total_ready / total_n) * 100)
   
   n_total_not <- sum(df_table$digitally_ready == "Not Ready", na.rm = TRUE)
-  p_total_not <- sprintf("%.1f", (n_total_not / total_n) * 100)
+  p_total_not <- sprintf("%.0f", (n_total_not / total_n) * 100)
   
-  # Assemble Table 2
+  # Table 2
   table2_df <- bind_rows(
     data.frame(
       Characteristic = "<b>Total Respondents</b>",
@@ -325,7 +334,7 @@ renderDT({
   # Render
   datatable(
     table2_df,
-    colnames = c("Characteristic", "Ready (N, %)", "Not Ready (N, %)", "Fisher's Exact Test (p-value)"),
+    colnames = c("Characteristic", "Ready (N, %)", "Not Ready (N, %)", "Fisher's exact test (p-value)"),
     caption = htmltools::tags$caption(
       style = 'caption-side: bottom; text-align: left; font-style: italic; font-size: 12px; color: #555;
       margin-top: 10px;',
